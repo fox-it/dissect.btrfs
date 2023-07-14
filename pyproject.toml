@@ -37,7 +37,7 @@ repository = "https://github.com/fox-it/dissect.btrfs"
 
 [project.optional-dependencies]
 full = [
-    "lzo",
+    "python-lzo",
     "zstandard",
 ]
 
