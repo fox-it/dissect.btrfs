@@ -1,6 +1,6 @@
 from __future__ import annotations
-from functools import lru_cache
 
+from functools import lru_cache
 from typing import TYPE_CHECKING, Iterator, Literal, Optional, Union
 
 from dissect.btrfs.c_btrfs import c_btrfs

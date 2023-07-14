@@ -1,8 +1,8 @@
 import datetime
 from typing import BinaryIO
-from dissect.util.stream import BufferedStream
 
 import pytest
+from dissect.util.stream import BufferedStream
 
 from dissect.btrfs.btrfs import Btrfs
 from dissect.btrfs.c_btrfs import c_btrfs
