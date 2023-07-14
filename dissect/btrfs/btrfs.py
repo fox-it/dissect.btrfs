@@ -1,3 +1,8 @@
+# References:
+# - https://btrfs.readthedocs.io/en/latest/
+# - https://github.com/torvalds/linux/tree/master/fs/btrfs
+# - https://github.com/btrfs/btrfs-dev-docs
+# - https://www.sciencedirect.com/science/article/pii/S1742287618301993
 from __future__ import annotations
 
 import io
