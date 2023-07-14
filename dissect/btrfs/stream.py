@@ -249,7 +249,6 @@ class ExtentStream(AlignedStream):
         size = self.size
 
         while length > 0:
-            # print(f"{extent_idx}/{extents_len} remaining {hex(length)}")
             if extent_idx >= extents_len:
                 # We somehow requested more data than we have runs for
                 break
