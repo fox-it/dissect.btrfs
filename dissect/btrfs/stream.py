@@ -242,7 +242,7 @@ class ExtentStream(AlignedStream):
         super().__init__(size, sector_size)
 
     def _read(self, offset: int, length: int) -> bytes:
-        r = []
+        result = []
 
         extent_idx = bisect_right(self._extent_offsets, offset)
         extents_len = len(self.extents)
@@ -268,7 +268,7 @@ class ExtentStream(AlignedStream):
 
             # Sparse run
             if (extent.disk_offset, extent.disk_offset) == (0, 0):
-                r.append(b"\x00" * read_count)
+                result.append(b"\x00" * read_count)
             else:
                 if (extent.compression, extent.encryption) == (c_btrfs.BTRFS_COMPRESS_NONE, 0):
                     # Quick path for no compression and no encryption
@@ -285,13 +285,13 @@ class ExtentStream(AlignedStream):
 
                     if extent_pos or read_count != len(buf):
                         buf = buf[extent_pos : extent_pos + read_count]
-                r.append(buf)
+                result.append(buf)
 
             offset += read_count
             length -= read_count
             extent_idx += 1
 
-        return b"".join(r)
+        return b"".join(result)
 
 
 def decode_extent(buf: bytes, compression: int, encryption: int, sector_size: int) -> bytes:

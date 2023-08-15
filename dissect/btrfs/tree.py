@@ -117,14 +117,15 @@ class Cursor:
         Args:
             index: The index of the key to read.
         """
-        if index not in self._keys:
-            struct = c_btrfs.btrfs_key_ptr if self._header.level else c_btrfs.btrfs_item
-            offset = len(c_btrfs.btrfs_header) + (len(struct) * index)
-            key = c_btrfs.btrfs_disk_key(self._node[offset : offset + len(c_btrfs.btrfs_disk_key)])
-            self._keys[index] = key
+        if key := self._keys.get(index):
             return key
 
-        return self._keys[index]
+        struct = c_btrfs.btrfs_key_ptr if self._header.level else c_btrfs.btrfs_item
+        offset = len(c_btrfs.btrfs_header) + (len(struct) * index)
+        key = c_btrfs.btrfs_disk_key(self._node[offset : offset + len(c_btrfs.btrfs_disk_key)])
+        self._keys[index] = key
+
+        return key
 
     def _read_item(self, index: int) -> Union[c_btrfs.btrfs_key_ptr, c_btrfs.btrfs_item]:
         """Read an item at the specified index.
@@ -132,18 +133,18 @@ class Cursor:
         Args:
             index: The index of the item to read.
         """
-        if index not in self._items:
-            struct = c_btrfs.btrfs_key_ptr if self._header.level else c_btrfs.btrfs_item
-            offset = len(c_btrfs.btrfs_header) + (len(struct) * index)
-            item = struct(self._node[offset : offset + len(struct)])
-            self._items[index] = item
-
-            if index not in self._keys:
-                self._keys[index] = item.key
-
+        if item := self._items.get(index):
             return item
 
-        return self._items[index]
+        struct = c_btrfs.btrfs_key_ptr if self._header.level else c_btrfs.btrfs_item
+        offset = len(c_btrfs.btrfs_header) + (len(struct) * index)
+        item = struct(self._node[offset : offset + len(struct)])
+        self._items[index] = item
+
+        if index not in self._keys:
+            self._keys[index] = item.key
+
+        return item
 
     def next(self) -> None:
         """Traverse to the next leaf item.
@@ -223,7 +224,8 @@ class Cursor:
         header_size = len(c_btrfs.btrfs_header)
         item = self.item()
 
-        return self._node[header_size + item.offset : header_size + item.offset + item.size]
+        offset = header_size + item.offset
+        return self._node[offset : offset + item.size]
 
     def iter(
         self,
@@ -246,7 +248,7 @@ class Cursor:
         if not self.search(objectid, type, offset):
             return
 
-        while _cmp(self.item().key, objectid, type, None if ignore_offset else offset) == 0:
+        while _cmp_key(self.item().key, objectid, type, None if ignore_offset else offset) == 0:
             yield self.get()
 
             try:
@@ -270,7 +272,7 @@ class Cursor:
         self.first()
 
         while True:
-            if _cmp(self.item().key, objectid, type, offset) == 0:
+            if _cmp_key(self.item().key, objectid, type, offset) == 0:
                 yield self.get()
 
             try:
@@ -297,13 +299,13 @@ class Cursor:
                 test_idx = (min_idx + max_idx) // 2
                 key = self._read_key(test_idx)
 
-                result = _cmp(key, objectid, type, offset or 0)
+                result = _cmp_key(key, objectid, type, offset or 0)
                 if result < 0:
                     min_idx = test_idx + 1
                 else:
                     max_idx = test_idx
 
-            result = _cmp(self._read_key(min_idx), objectid, type, offset)
+            result = _cmp_key(self._read_key(min_idx), objectid, type, offset)
             if self._header.level:
                 if result > 0 and min_idx > 0:
                     min_idx -= 1
@@ -321,7 +323,7 @@ class Cursor:
         return False
 
 
-def _cmp(
+def _cmp_key(
     key: c_btrfs.btrfs_disk_key,
     objectid: Optional[int] = None,
     type: Optional[int] = None,
@@ -333,10 +335,10 @@ def _cmp(
     Search parameters of ``None`` are ignored in the comparison.
 
     Args:
-        key: The key on disk to compare against.
-        objectid: Optional object ID to search for.
-        type: Optional type to search for.
-        offset: Optional offset to search for.
+        key: The key on disk to compare.
+        objectid: Optional object ID to compare against.
+        type: Optional type to compare against.
+        offset: Optional offset to compare against.
     """
     if objectid is not None:
         if key.objectid > objectid:
