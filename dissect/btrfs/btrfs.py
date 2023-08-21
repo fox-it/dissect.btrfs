@@ -16,7 +16,11 @@ from dissect.util import ts
 from dissect.util.stream import BufferedStream
 
 from dissect.btrfs.c_btrfs import FT_MAP, c_btrfs
-from dissect.btrfs.exceptions import NotADirectoryError, NotASymlinkError
+from dissect.btrfs.exceptions import (
+    FileNotFoundError,
+    NotADirectoryError,
+    NotASymlinkError,
+)
 from dissect.btrfs.stream import ChunkStream, Extent, ExtentStream, decode_extent
 from dissect.btrfs.tree import BTree
 
@@ -61,18 +65,18 @@ class Btrfs:
 
         self.devices = {sb.dev_item.devid: fh for sb, fh in sb_fhs}
 
-        self._open_tree = cache(self._open_tree)
-        self._open_volume = cache(self._open_volume)
+        self._open_tree = lru_cache(32)(self._open_tree)
+        self.open_subvolume = lru_cache(16)(self.open_subvolume)
 
         self._logical_fh = ChunkStream(self)
         self._initialize_chunks()
 
         self._root_tree = BTree(self, root_offset=self.sb.root)
 
-        self.fs_tree = self._open_volume(c_btrfs.BTRFS_FS_TREE_OBJECTID, "<FS_TREE>")
+        self.fs_tree = self.open_subvolume(c_btrfs.BTRFS_FS_TREE_OBJECTID)
 
-        default_volume = self._open_default_volume()
-        self.root = default_volume.root
+        self.default_subvolume = self._open_default_subvolume()
+        self.root = self.default_subvolume.root
 
     def get(self, path: Union[str, int], node: Optional[INode] = None) -> INode:
         """Retrieve a Btrfs inode by path or inode number.
@@ -81,35 +85,37 @@ class Btrfs:
             path: Filesystem path or inode number.
             node: Optional inode used for relative lookups.
         """
-        if isinstance(path, int):
-            return self.root.volume.inode(path)
+        return self.default_subvolume.get(path, node)
 
-        node = node or self.root
+    def subvolumes(self) -> Iterator[Subvolume]:
+        """Yield all subvolumes."""
+        search_ids = [c_btrfs.BTRFS_FS_TREE_OBJECTID]
 
-        parts = path.split("/")
+        cursor = self._root_tree.cursor()
+        for object_id in search_ids:
+            for item, _ in cursor.iter(objectid=object_id, type=c_btrfs.BTRFS_ROOT_REF_KEY):
+                search_ids.append(item.key.offset)
+                yield self.open_subvolume(item.key.offset)
+            cursor.reset()
 
-        for part in parts:
-            if not part:
-                continue
+    def find_subvolume(self, path: Optional[str] = None) -> Optional[Subvolume]:
+        """Find a subvolume by path.
 
-            if part == ".":
-                continue
+        Args:
+            path: The path of the subvolume to find.
+        """
+        for subvolume in self.subvolumes():
+            if subvolume.path == path:
+                return subvolume
 
-            if part == "..":
-                node = node.parent or node
-                continue
+    def open_subvolume(self, objectid: int, parent: Optional[INode] = None) -> Subvolume:
+        """Open a subvolume.
 
-            while node.is_symlink():
-                node = node.link_inode
-
-            for name, entry in node.iterdir():
-                if name == part:
-                    node = entry
-                    break
-            else:
-                raise FileNotFoundError(f"File not found: {path}")
-
-        return node
+        Args:
+            objectid: The objectid of the subvolume to open.
+            parent: Optional parent node to attach to the root of the subvolume.
+        """
+        return Subvolume(self, objectid, parent)
 
     def _initialize_chunks(self) -> None:
         """Initialize the logical data stream by reading the system chunk array and traversing the chunk tree."""
@@ -138,64 +144,136 @@ class Btrfs:
         Args:
             objectid: The object ID of the tree to open.
         """
-        _, data = self._root_tree.search(objectid, c_btrfs.BTRFS_ROOT_ITEM_KEY)
+        _, data = self._root_tree.find(objectid, c_btrfs.BTRFS_ROOT_ITEM_KEY)
         root_item = c_btrfs.btrfs_root_item(data)
         return BTree(self, root_item)
 
-    def _open_default_volume(self) -> Volume:
-        """Find and open the volume that's configured as default."""
-        _, data = self._root_tree.search(c_btrfs.BTRFS_ROOT_TREE_DIR_OBJECTID, c_btrfs.BTRFS_DIR_ITEM_KEY)
+    def _open_default_subvolume(self) -> Subvolume:
+        """Find and open the subvolume that's configured as default."""
+        _, data = self._root_tree.find(c_btrfs.BTRFS_ROOT_TREE_DIR_OBJECTID, c_btrfs.BTRFS_DIR_ITEM_KEY)
         root_dir_item = c_btrfs.btrfs_dir_item(data)
-        return Volume(self, root_dir_item.location.objectid, root_dir_item.name.decode(errors="surrogateescape"))
-
-    def _open_volume(self, objectid: int, name: str, parent: Optional[INode] = None) -> Volume:
-        """Helper method for opening a volume."""
-        return Volume(self, objectid, name, parent)
+        return Subvolume(self, root_dir_item.location.objectid)
 
     def _read_node(self, address: int) -> bytes:
-        """Helper method for reading a node."""
+        """Helper method for reading a node.
+
+        Args:
+            address: The node address to read.
+        """
         self._logical_fh.seek(address)
         return self._logical_fh.read(self.node_size)
 
 
-class Volume:
-    """Represent a Btrfs volume.
+class Subvolume:
+    """Represent a Btrfs subvolume.
 
-    Btrfs has support for multiple volumes. The default volume is the ``FS_TREE`` volume.
-    Each (sub)volume has its own B-tree.
+    Btrfs has support for multiple subvolumes. The default subvolume is the ``FS_TREE`` subvolume.
+    Each subvolume has its own B-tree.
 
     Args:
-        btrfs: The filesystem this volume belongs to.
-        objectid: The object ID of the volume to open.
-        name: The name of the volume.
-        parent: Optional parent node to attach to the root of the volume.
+        btrfs: The filesystem this subvolume belongs to.
+        objectid: The object ID of the subvolume to open.
+        parent: Optional parent node to attach to the root of the subvolume.
     """
 
-    def __init__(self, btrfs: Btrfs, objectid: int, name: str, parent: Optional[INode] = None):
+    def __init__(self, btrfs: Btrfs, objectid: int, parent: Optional[INode] = None):
         self.btrfs = btrfs
         self.objectid = objectid
-        self.name = name
-
-        self._tree = self.btrfs._open_tree(self.objectid)
-        self.uuid = UUID(bytes=self._tree.root_item.uuid)
+        self.parent = parent
 
         self.inode = lru_cache(8192)(self.inode)
-
-        self.root = self.inode(self._tree.root_item.root_dirid, c_btrfs.BTRFS_FT_DIR, parent)
+        self.resolve_path = lru_cache(1024)(self.resolve_path)
 
     def __repr__(self) -> str:
-        return f"<Volume objectid={self.objectid} name={self.name!r}>"
+        return f"<Subvolume objectid={self.objectid}>"
+
+    @cached_property
+    def tree(self) -> BTree:
+        return self.btrfs._open_tree(self.objectid)
+
+    @cached_property
+    def uuid(self) -> UUID:
+        return UUID(bytes=self.tree.root_item.uuid)
+
+    @cached_property
+    def root(self) -> INode:
+        return self.inode(self.tree.root_item.root_dirid, c_btrfs.BTRFS_FT_DIR, self.parent)
+
+    @cached_property
+    def path(self) -> str:
+        parts = []
+        objectid = self.objectid
+        while objectid != c_btrfs.BTRFS_FS_TREE_OBJECTID:
+            item, data = self.btrfs._root_tree.find(objectid=objectid, type=c_btrfs.BTRFS_ROOT_BACKREF_KEY)
+            root_ref = c_btrfs.btrfs_root_ref(data)
+            name = root_ref.name.decode(errors="surrogateescape")
+            parts.append(name)
+
+            if path := self.btrfs.open_subvolume(item.key.offset).resolve_path(root_ref.dirid):
+                parts.append(path)
+
+            objectid = item.key.offset
+
+        return "/".join(parts[::-1])
+
+    def get(self, path: Union[str, int], node: Optional[INode] = None) -> INode:
+        """Retrieve a Btrfs inode by path or inode number.
+
+        Args:
+            path: Filesystem path or inode number.
+            node: Optional inode used for relative lookups.
+        """
+        if isinstance(path, int):
+            return self.inode(path)
+
+        node = node or self.root
+
+        parts = path.split("/")
+
+        for part in parts:
+            if not part:
+                continue
+
+            if part == ".":
+                continue
+
+            if part == "..":
+                node = node.parent or node
+                continue
+
+            while node.is_symlink():
+                node = node.link_inode
+
+            for name, entry in node.iterdir():
+                if name == part:
+                    node = entry
+                    break
+            else:
+                raise FileNotFoundError(f"File not found: {path}")
+
+        return node
 
     def inode(self, inum: int, type: Optional[int] = None, parent: Optional[INode] = None) -> INode:
         """Return an :class:`INode` by number, optionally attaching a type and parent."""
         return INode(self, inum, type, parent)
+
+    def resolve_path(self, objectid: int) -> str:
+        names = []
+        while objectid != c_btrfs.BTRFS_FIRST_FREE_OBJECTID:
+            item, data = self.tree.find(objectid, c_btrfs.BTRFS_INODE_REF_KEY)
+            inode_ref = c_btrfs.btrfs_inode_ref(data)
+            names.append(inode_ref.name.decode(errors="surrogateescape"))
+
+            objectid = item.key.offset
+
+        return "/".join(names[::-1])
 
 
 class INode:
     """Represent a Btrfs inode.
 
     Args:
-        volume: The volume this inode belongs to.
+        subvolume: The subvolume this inode belongs to.
         inum: The inode number of this inode.
         type: Optional file type of this inode, as observed in a directory entry.
         parent: Optional parent of this inode, if this inode is parsed from a directory listing.
@@ -203,13 +281,13 @@ class INode:
 
     def __init__(
         self,
-        volume: Volume,
+        subvolume: Subvolume,
         inum: int,
         type: Optional[int] = None,
         parent: Optional[INode] = None,
     ):
-        self.volume = volume
-        self.btrfs = volume.btrfs
+        self.subvolume = subvolume
+        self.btrfs = subvolume.btrfs
         self.inum = inum
         self._type = type
         self.parent = parent
@@ -217,12 +295,12 @@ class INode:
         self.listdir = cache(self.listdir)
 
     def __repr__(self) -> str:
-        return f"<inode {self.volume.objectid}:{self.inum}>"
+        return f"<inode {self.subvolume.objectid}:{self.inum}>"
 
     @cached_property
     def inode(self) -> c_btrfs.btrfs_inode_item:
         """Return the parsed inode structure."""
-        _, data = self.volume._tree.search(self.inum, c_btrfs.BTRFS_INODE_ITEM_KEY)
+        _, data = self.subvolume.tree.find(self.inum, c_btrfs.BTRFS_INODE_ITEM_KEY)
         return c_btrfs.btrfs_inode_item(data)
 
     @cached_property
@@ -342,23 +420,60 @@ class INode:
             relnode = None
         else:
             relnode = self.parent
-        return self.btrfs.get(self.link, relnode)
+        return self.subvolume.get(self.link, relnode)
 
-    @cached_property
+    @property
     def parents(self) -> list[INode]:
-        for item, data in self.volume._tree.cursor().iter(self.inum, c_btrfs.BTRFS_INODE_REF_KEY):
+        for item, data in self.subvolume.tree.cursor().iter(self.inum, c_btrfs.BTRFS_INODE_REF_KEY):
             inode_ref = c_btrfs.btrfs_inode_ref(data)
             if inode_ref.name == b"..":
                 if self.parent:
                     yield self.parent
             else:
-                yield self.volume.inode(item.key.offset, c_btrfs.BTRFS_FT_DIR)
+                yield self.subvolume.inode(item.key.offset, c_btrfs.BTRFS_FT_DIR)
+
+    @property
+    def path(self) -> str:
+        """Return the path to this inode within the subvolume. In case of multiple hardlinks, return the first path."""
+        return next(self.paths())
+
+    @property
+    def full_path(self) -> str:
+        """Return the full path to this inode. In case of multiple hardlinks, return the first path."""
+        return next(self.paths(True))
+
+    def paths(self, full: bool = False) -> Iterator[str]:
+        """Yield all paths (hardlinks) to this inode.
+
+        By default only resolves up to the root of the subvolume this inode belongs to.
+        For a full path to the root of the filesystem tree, set ``full`` to ``True``.
+
+        Args:
+            full: Whether to fully resolve the path up to the root of the filesystem tree.
+        """
+        root = self.subvolume.path if full else ""
+        for item, data in self.subvolume.tree.cursor().iter(self.inum, c_btrfs.BTRFS_INODE_REF_KEY):
+            if item.key.offset == self.inum:
+                yield root
+                break
+
+            inode_ref = c_btrfs.btrfs_inode_ref(data)
+            name = inode_ref.name.decode(errors="surrogateescape")
+
+            path = [name]
+            if parent_path := self.subvolume.resolve_path(item.key.offset):
+                path.append(parent_path)
+
+            if root:
+                path.append(root)
+
+            yield "/".join(path[::-1])
 
     def listdir(self) -> dict[str, INode]:
         """Return a directory listing."""
         return {name: inode for name, inode in self.iterdir()}
 
-    def iterdir(self) -> Iterator[INode]:
+    def iterdir(self) -> Iterator[tuple[str, INode]]:
         """Iterate directory contents."""
         if not self.is_dir():
             raise NotADirectoryError(f"{self!r} is not a directory")
@@ -366,17 +481,17 @@ class INode:
         yield ".", self
         yield "..", self.parent or self
 
-        cursor = self.volume._tree.cursor()
+        cursor = self.subvolume.tree.cursor()
         for _, data in cursor.iter(self.inum, c_btrfs.BTRFS_DIR_INDEX_KEY):
             dir_item = c_btrfs.btrfs_dir_item(data)
             dir_item_type = dir_item.location.type
             name = dir_item.name.decode(errors="surrogateescape")
 
             if dir_item_type == c_btrfs.BTRFS_ROOT_ITEM_KEY:
-                subvolume = self.btrfs._open_volume(dir_item.location.objectid, name, self)
+                subvolume = self.btrfs.open_subvolume(dir_item.location.objectid, self)
                 yield name, subvolume.root
             elif dir_item_type == c_btrfs.BTRFS_INODE_ITEM_KEY:
-                yield name, self.volume.inode(dir_item.location.objectid, dir_item.type, self)
+                yield name, self.subvolume.inode(dir_item.location.objectid, dir_item.type, self)
             else:
                 raise NotImplementedError(f"Unknown dir_item type: {dir_item}")
 
@@ -390,7 +505,7 @@ class INode:
 
         extents = []
 
-        cursor = self.volume._tree.cursor()
+        cursor = self.subvolume.tree.cursor()
         for _, data in cursor.iter(self.inum, c_btrfs.BTRFS_EXTENT_DATA_KEY, 0, ignore_offset=True):
             extent = c_btrfs.btrfs_file_extent_item_inline(data)
 

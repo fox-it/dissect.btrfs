@@ -36,6 +36,11 @@ def btrfs_subvolume() -> Iterator[BinaryIO]:
 
 
 @pytest.fixture
+def btrfs_subvolume_nested() -> Iterator[BinaryIO]:
+    yield from open_file_gz("data/btrfs-subvolume-nested.bin.gz")
+
+
+@pytest.fixture
 def btrfs_subvolume_custom_default() -> Iterator[BinaryIO]:
     yield from open_file_gz("data/btrfs-subvolume-custom-default.bin.gz")
 

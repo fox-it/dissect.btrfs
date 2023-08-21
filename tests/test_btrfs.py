@@ -10,6 +10,10 @@ from dissect.btrfs.exceptions import Error
 
 
 def assert_test_data(fs: Btrfs) -> None:
+    entry = fs.get("")
+    assert entry.is_dir()
+    assert entry.path == ""
+
     entry = fs.get("path")
     assert entry.is_dir()
     assert not entry.is_file()
@@ -17,26 +21,31 @@ def assert_test_data(fs: Btrfs) -> None:
     assert not entry.is_device()
     assert not entry.is_ipc()
     assert entry.size == 4
+    assert entry.path == "path"
     assert entry.uid == 1000
     assert entry.gid == 1000
 
     entry = fs.get("path/to/a/file.txt")
     assert entry.is_file()
     assert entry.size == 12
+    assert entry.path == "path/to/a/file.txt"
     assert entry.open().read() == b"file in dir\n"
 
     entry = fs.get("small.txt")
     assert entry.is_file()
     assert entry.size == 29
+    assert entry.path == "small.txt"
     assert entry.open().read() == b"small file content goes here\n"
 
     entry = fs.get("large.txt")
     assert entry.is_file()
     assert entry.size == 5242881
+    assert entry.path == "large.txt"
     assert entry.open().read() == (b"a" * 5242880) + b"\n"
 
     entry = fs.get("link.txt")
     assert entry.is_symlink()
+    assert entry.path == "link.txt"
     assert entry.link == "path/to/a/file.txt"
 
 
@@ -66,6 +75,9 @@ def test_btrfs_subvolume(btrfs_subvolume: BinaryIO) -> None:
     assert str(fs.uuid) == "74387226-fa97-4f42-a276-9bb07ce5e62d"
 
     subvol = fs.get("subvol")
+    assert subvol.path == ""
+    assert subvol.subvolume.path == "subvol"
+    assert subvol.full_path == "subvol"
     assert list(subvol.listdir().keys()) == [".", "..", "cross-volume-link.txt", "small.txt", "large.txt", "some"]
 
     assert_test_data(fs)
@@ -73,6 +85,8 @@ def test_btrfs_subvolume(btrfs_subvolume: BinaryIO) -> None:
     entry = fs.get("subvol/some/more/dirs/empty.txt")
     assert entry.is_file()
     assert entry.size == 0
+    assert entry.path == "some/more/dirs/empty.txt"
+    assert entry.full_path == "subvol/some/more/dirs/empty.txt"
     assert entry.open().read() == b""
 
     entry = fs.get("subvol/small.txt")
@@ -95,6 +109,24 @@ def test_btrfs_subvolume_custom_default(btrfs_subvolume_custom_default: BinaryIO
 
     assert fs.label == "btrfs-subvolume-custom-default"
     assert str(fs.uuid) == "74387226-fa97-4f42-a276-9bb07ce5e62d"
+
+
+def test_btrfs_subvolume_nested(btrfs_subvolume_nested: BinaryIO) -> None:
+    fs = Btrfs(btrfs_subvolume_nested)
+
+    assert fs.label == "btrfs-subvolume-nested"
+    assert str(fs.uuid) == "983bda53-2928-4182-a53d-041eade66473"
+
+    subvolumes = list(fs.subvolumes())
+
+    assert len(subvolumes) == 3
+    assert sorted((subvol.objectid, subvol.path) for subvol in subvolumes) == [
+        (256, "dir/volume"),
+        (257, "default"),
+        (258, "default/volume"),
+    ]
+
+    assert fs.find_subvolume("default/volume").objectid == 258
 
 
 def test_btrfs_subvolume_snapshot(btrfs_subvolume_snapshot: BinaryIO) -> None:

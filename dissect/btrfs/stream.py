@@ -69,8 +69,8 @@ class ChunkStream(AlignedStream):
     def add(self, offset: int, chunk: c_btrfs.btrfs_chunk) -> None:
         """Add a chunk to the stream.
 
-        This will iterate all stripes and link them to the appropriate devices. Allows for missing devices, if the RAID
-        profile allows this.
+        This will iterate all stripes and link them to the appropriate devices.
+        Allows for missing devices, if the RAID profile allows this.
 
         Args:
             offset: The logical offset to add this chunk for.

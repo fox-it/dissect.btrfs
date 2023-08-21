@@ -37,7 +37,7 @@ class BTree:
         """Return a new cursor into the B-tree."""
         return Cursor(self)
 
-    def search(
+    def find(
         self, objectid: Optional[int] = None, type: Optional[int] = None, offset: Optional[int] = None
     ) -> tuple[c_btrfs.btrfs_item, memoryview]:
         """Search for a single item in the B-tree.

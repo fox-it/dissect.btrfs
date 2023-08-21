@@ -1,4 +1,4 @@
-from dissect.btrfs.btrfs import Btrfs, INode, Volume
+from dissect.btrfs.btrfs import Btrfs, INode, Subvolume
 from dissect.btrfs.exceptions import (
     Error,
     FileNotFoundError,
@@ -9,7 +9,7 @@ from dissect.btrfs.exceptions import (
 __all__ = [
     "Btrfs",
     "INode",
-    "Volume",
+    "Subvolume",
     "Error",
     "FileNotFoundError",
     "NotADirectoryError",
