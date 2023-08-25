@@ -119,8 +119,9 @@ def test_btrfs_subvolume_nested(btrfs_subvolume_nested: BinaryIO) -> None:
 
     subvolumes = list(fs.subvolumes())
 
-    assert len(subvolumes) == 3
+    assert len(subvolumes) == 4
     assert sorted((subvol.objectid, subvol.path) for subvol in subvolumes) == [
+        (5, ""),
         (256, "dir/volume"),
         (257, "default"),
         (258, "default/volume"),

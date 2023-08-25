@@ -89,6 +89,8 @@ class Btrfs:
 
     def subvolumes(self) -> Iterator[Subvolume]:
         """Yield all subvolumes."""
+        yield self.fs_tree
+
         search_ids = [c_btrfs.BTRFS_FS_TREE_OBJECTID]
 
         cursor = self._root_tree.cursor()
