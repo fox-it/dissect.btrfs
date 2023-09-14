@@ -95,7 +95,9 @@ class Btrfs:
 
         cursor = self._root_tree.cursor()
         for object_id in search_ids:
-            for item, _ in cursor.iter(objectid=object_id, type=c_btrfs.BTRFS_ROOT_REF_KEY):
+            for item, _ in cursor.iter(
+                objectid=object_id, type=c_btrfs.BTRFS_ROOT_REF_KEY, offset=0, ignore_offset=True
+            ):
                 search_ids.append(item.key.offset)
                 yield self.open_subvolume(item.key.offset)
             cursor.reset()
@@ -135,7 +137,10 @@ class Btrfs:
 
         chunk_tree = BTree(self, root_offset=self.sb.chunk_root)
         for item, data in chunk_tree.cursor().iter(
-            objectid=c_btrfs.BTRFS_FIRST_CHUNK_TREE_OBJECTID, type=c_btrfs.BTRFS_CHUNK_ITEM_KEY
+            objectid=c_btrfs.BTRFS_FIRST_CHUNK_TREE_OBJECTID,
+            type=c_btrfs.BTRFS_CHUNK_ITEM_KEY,
+            offset=0,
+            ignore_offset=True,
         ):
             chunk = c_btrfs.btrfs_chunk(data)
             self._logical_fh.add(item.key.offset, chunk)
@@ -426,7 +431,9 @@ class INode:
 
     @property
     def parents(self) -> list[INode]:
-        for item, data in self.subvolume.tree.cursor().iter(self.inum, c_btrfs.BTRFS_INODE_REF_KEY):
+        for item, data in self.subvolume.tree.cursor().iter(
+            self.inum, c_btrfs.BTRFS_INODE_REF_KEY, 0, ignore_offset=True
+        ):
             inode_ref = c_btrfs.btrfs_inode_ref(data)
             if inode_ref.name == b"..":
                 if self.parent:
@@ -454,7 +461,9 @@ class INode:
             full: Whether to fully resolve the path up to the root of the filesystem tree.
         """
         root = self.subvolume.path if full else ""
-        for item, data in self.subvolume.tree.cursor().iter(self.inum, c_btrfs.BTRFS_INODE_REF_KEY):
+        for item, data in self.subvolume.tree.cursor().iter(
+            self.inum, c_btrfs.BTRFS_INODE_REF_KEY, 0, ignore_offset=True
+        ):
             if item.key.offset == self.inum:
                 yield root
                 break
@@ -483,8 +492,10 @@ class INode:
         yield ".", self
         yield "..", self.parent or self
 
+        # The offset in BTRFS_DIR_INDEX_KEY items is the directory index
+        # Start searching from index 2 (because . and .. are 0 and 1 respectively)
         cursor = self.subvolume.tree.cursor()
-        for _, data in cursor.iter(self.inum, c_btrfs.BTRFS_DIR_INDEX_KEY):
+        for _, data in cursor.iter(self.inum, c_btrfs.BTRFS_DIR_INDEX_KEY, 0, ignore_offset=True):
             dir_item = c_btrfs.btrfs_dir_item(data)
             dir_item_type = dir_item.location.type
             name = dir_item.name.decode(errors="surrogateescape")

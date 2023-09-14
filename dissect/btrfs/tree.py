@@ -151,6 +151,15 @@ class Cursor:
 
         Will move up and down the tree to find the next leaf item.
         """
+        self.next_node()
+        while self._header.level:
+            self.push(self.item().blockptr)
+
+    def next_node(self) -> None:
+        """Traverse to the next node.
+
+        Will move up and down the tree to find the next node.
+        """
         while self._index is not None and self._index + 1 >= self._header.nritems:
             self.pop()
 
@@ -158,11 +167,19 @@ class Cursor:
             raise ValueError("Reached end")
 
         self._index += 1
-
-        while self._header.level:
+        if self._header.level:
             self.push(self.item().blockptr)
 
     def prev(self) -> None:
+        """Traverse to the previous leaf item.
+
+        Will move up and down the tree to find the previous leaf item.
+        """
+        self.prev_node()
+        while self._header.level:
+            self.push(self.item().blockptr, -1)
+
+    def prev_node(self) -> None:
         """Traverse to the previous leaf item.
 
         Will move up and down the tree to find the previous leaf item.
@@ -174,8 +191,7 @@ class Cursor:
             raise ValueError("Reached start")
 
         self._index -= 1
-
-        while self._header.level:
+        if self._header.level:
             self.push(self.item().blockptr, -1)
 
     def first(self) -> None:
@@ -308,14 +324,28 @@ class Cursor:
             result = _cmp_key(self._read_key(min_idx), objectid, type, offset)
             if self._header.level:
                 if result > 0 and min_idx > 0:
+                    # When we're at a node level, and the next key is larger than what we're searching for, then
+                    # we must traverse down the previous node
                     min_idx -= 1
                 self._index = min_idx
                 self.push(self._read_item(min_idx).blockptr)
                 continue
             else:
                 if result >= 0:
+                    # Count a matching or larger key as a win
                     self._index = min_idx
                     return True
+                elif min_idx == self._header.nritems - 1:
+                    # Special case where we have exhausted all leaf nodes but all keys are still smaller
+                    # In this case, try to travel to the next node (up one level, next item, down one level)
+                    # Worst case we end up at a key that's larger than our search parameters.
+                    self._index = min_idx
+                    try:
+                        self.next_node()
+                        continue
+                    except ValueError:
+                        self._index = None
+                        return False
 
             break
 
