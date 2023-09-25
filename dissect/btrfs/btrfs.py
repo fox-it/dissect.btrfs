@@ -546,7 +546,7 @@ class INode:
             if extent.type == c_btrfs.BTRFS_FILE_EXTENT_INLINE:
                 header_len = len(c_btrfs.btrfs_file_extent_item_inline)
                 buf = decode_extent(
-                    data[header_len : header_len + self.size],
+                    data[header_len:],
                     extent.compression,
                     extent.encryption,
                     self.btrfs.sector_size,
