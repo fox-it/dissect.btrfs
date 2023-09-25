@@ -12,6 +12,7 @@ from functools import cache, cached_property, lru_cache
 from typing import BinaryIO, Iterator, Optional, Union
 from uuid import UUID
 
+from crc32c import crc32c
 from dissect.util import ts
 from dissect.util.stream import BufferedStream
 
@@ -234,29 +235,41 @@ class Subvolume:
             return self.inode(path)
 
         node = node or self.root
+        subvolume = self
 
-        parts = path.split("/")
+        parts = path.encode().split(b"/")
 
         for part in parts:
             if not part:
                 continue
 
-            if part == ".":
+            if part == b".":
                 continue
 
-            if part == "..":
+            if part == b"..":
                 node = node.parent or node
                 continue
 
             while node.is_symlink():
                 node = node.link_inode
 
-            for name, entry in node.iterdir():
-                if name == part:
-                    node = entry
-                    break
-            else:
+            # https://stackoverflow.com/a/40433980
+            part_hash = crc32c(part, ~1 ^ 0xFFFFFFFF) ^ 0xFFFFFFFF
+            try:
+                _, data = subvolume.tree.find(node.inum, c_btrfs.BTRFS_DIR_ITEM_KEY, part_hash)
+            except KeyError:
                 raise FileNotFoundError(f"File not found: {path}")
+
+            dir_item = c_btrfs.btrfs_dir_item(data)
+            dir_item_type = dir_item.location.type
+
+            if dir_item_type == c_btrfs.BTRFS_ROOT_ITEM_KEY:
+                subvolume = self.btrfs.open_subvolume(dir_item.location.objectid, subvolume)
+                node = subvolume.root
+            elif dir_item_type == c_btrfs.BTRFS_INODE_ITEM_KEY:
+                node = subvolume.inode(dir_item.location.objectid, dir_item.type, subvolume)
+            else:
+                raise NotImplementedError(f"Unknown dir_item type: {dir_item}")
 
         return node
 
@@ -451,6 +464,14 @@ class INode:
         """Return the full path to this inode. In case of multiple hardlinks, return the first path."""
         return next(self.paths(True))
 
+    def get(self, path: str) -> INode:
+        """Retrieve a Btrfs inode relative from this inode.
+
+        Args:
+            path: Filesystem path.
+        """
+        return self.subvolume.get(path, self)
+
     def paths(self, full: bool = False) -> Iterator[str]:
         """Yield all paths (hardlinks) to this inode.
 
@@ -495,7 +516,7 @@ class INode:
         # The offset in BTRFS_DIR_INDEX_KEY items is the directory index
         # Start searching from index 2 (because . and .. are 0 and 1 respectively)
         cursor = self.subvolume.tree.cursor()
-        for _, data in cursor.iter(self.inum, c_btrfs.BTRFS_DIR_INDEX_KEY, 0, ignore_offset=True):
+        for _, data in cursor.iter(self.inum, c_btrfs.BTRFS_DIR_INDEX_KEY, 2, ignore_offset=True):
             dir_item = c_btrfs.btrfs_dir_item(data)
             dir_item_type = dir_item.location.type
             name = dir_item.name.decode(errors="surrogateescape")

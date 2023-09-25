@@ -48,7 +48,7 @@ class BTree:
             offset: Optional offset to search for.
         """
         cursor = self.cursor()
-        if not cursor.search(objectid, type, offset):
+        if not cursor.search(objectid, type, offset) or _cmp_key(cursor.item().key, objectid, type, offset) != 0:
             raise KeyError(f"Can't find item with key ({objectid}, {type}, {offset})")
 
         return cursor.get()
