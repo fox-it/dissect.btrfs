@@ -12,9 +12,9 @@ from functools import cache, cached_property, lru_cache
 from typing import BinaryIO, Iterator, Optional, Union
 from uuid import UUID
 
-from crc32c import crc32c
 from dissect.util import ts
 from dissect.util.stream import BufferedStream
+from google_crc32c import extend as crc32c
 
 from dissect.btrfs.c_btrfs import FT_MAP, c_btrfs
 from dissect.btrfs.exceptions import (
@@ -254,7 +254,7 @@ class Subvolume:
                 node = node.link_inode
 
             # https://stackoverflow.com/a/40433980
-            part_hash = crc32c(part, ~1 ^ 0xFFFFFFFF) ^ 0xFFFFFFFF
+            part_hash = crc32c(~1 ^ 0xFFFFFFFF, part) ^ 0xFFFFFFFF
             try:
                 _, data = subvolume.tree.find(node.inum, c_btrfs.BTRFS_DIR_ITEM_KEY, part_hash)
             except KeyError:

@@ -27,7 +27,7 @@ classifiers = [
 dependencies = [
     "dissect.cstruct>=3.0.dev,<4.0.dev",
     "dissect.util>=3.0.dev,<4.0.dev",
-    "crc32c",
+    "google-crc32c",
 ]
 dynamic = ["version"]
 
