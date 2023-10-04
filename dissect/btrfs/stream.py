@@ -149,12 +149,8 @@ class ChunkStream(AlignedStream):
                     while stripe.fh is None:
                         # We already checked for the maximum amount of tolerated failures when adding the chunk,
                         # so looping here should be safe
-                        if chunk.type & BTRFS_BLOCK_GROUP_RAID1_MASK:
-                            stripe_idx += 1
-                        elif chunk.type & BTRFS_BLOCK_GROUP.DUP:
+                        if chunk.type & BTRFS_BLOCK_GROUP.DUP:
                             stripe_idx = 1
-                        elif chunk.type & BTRFS_BLOCK_GROUP.RAID10:
-                            stripe_idx += 1
                         elif chunk.type & BTRFS_BLOCK_GROUP_RAID56_MASK:
                             raise NotImplementedError("RAID56 recovery is not yet supported")
                         else:
