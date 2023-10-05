@@ -218,7 +218,7 @@ def test_btrfs_profiles_partial(fixture: str, request: pytest.FixtureRequest) ->
         assert_test_data(fs)
 
 
-def test_btrfs_sparse(btrfs_sparse: BinaryIO):
+def test_btrfs_sparse(btrfs_sparse: BinaryIO) -> None:
     fs = Btrfs(btrfs_sparse)
 
     entry = fs.get("sparse_start")
