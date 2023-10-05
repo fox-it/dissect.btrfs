@@ -313,6 +313,7 @@ class INode:
         self.parent = parent
 
         self.listdir = cache(self.listdir)
+        self.extents = cache(self.extents)
 
     def __repr__(self) -> str:
         return f"<inode {self.subvolume.objectid}:{self.inum}>"
@@ -529,18 +530,23 @@ class INode:
             else:
                 raise NotImplementedError(f"Unknown dir_item type: {dir_item}")
 
+    def extents(self) -> Optional[list[Extent]]:
+        if isinstance((fh := self.open()), ExtentStream):
+            return fh.extents
+
     def open(self) -> BinaryIO:
         """Return the data stream for the inode.
 
         File data in Btrfs can be inlined in the B-tree or stored in file extents. In both cases it can be compressed.
         """
-        if not self.inode.nbytes:
+        if not self.size:
             return BufferedStream(io.BytesIO(), size=0)
 
+        offset = 0
         extents = []
 
         cursor = self.subvolume.tree.cursor()
-        for _, data in cursor.iter(self.inum, c_btrfs.BTRFS_EXTENT_DATA_KEY, 0, ignore_offset=True):
+        for item, data in cursor.iter(self.inum, c_btrfs.BTRFS_EXTENT_DATA_KEY, 0, ignore_offset=True):
             extent = c_btrfs.btrfs_file_extent_item_inline(data)
 
             if extent.type == c_btrfs.BTRFS_FILE_EXTENT_INLINE:
@@ -555,6 +561,13 @@ class INode:
 
             extent = c_btrfs.btrfs_file_extent_item_reg(data)
             if extent.type == c_btrfs.BTRFS_FILE_EXTENT_REG:
+                key = item.key
+
+                if offset < key.offset:
+                    gap = key.offset - offset
+                    extents.append(Extent(0, 0, 0, 0, 0, gap))
+                    offset += gap
+
                 extents.append(
                     Extent(
                         extent.compression,
@@ -565,6 +578,10 @@ class INode:
                         extent.num_bytes,
                     )
                 )
+                offset += extent.num_bytes
+
+        if offset < self.size:
+            extents.append(Extent(0, 0, 0, 0, 0, self.size - offset))
 
         return ExtentStream(self.btrfs._logical_fh, extents, self.size, self.btrfs.sector_size)
 

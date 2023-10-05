@@ -252,8 +252,12 @@ class ExtentStream(AlignedStream):
             # If run_idx == 0, we only have a single run
             extent_pos = 0 if extent_idx == 0 else self._extent_offsets[extent_idx - 1]
             extent = self.extents[extent_idx]
-            extent_pos = (offset - extent_pos) + extent.offset
+            extent_pos = offset - extent_pos
             extent_remaining = extent.length - extent_pos
+
+            # The relative extent offset is only relevant for knowing where to actually start reading on the disk
+            # Add it to the current extent_pos because that's where this variable is only going to be used for
+            extent_pos += extent.offset
 
             # Sometimes the self.size is way larger than what we actually have runs for?
             # Stop reading if we reach a negative run_remaining
@@ -263,7 +267,7 @@ class ExtentStream(AlignedStream):
             read_count = min(size - offset, min(extent_remaining, length))
 
             # Sparse run
-            if (extent.disk_offset, extent.disk_offset) == (0, 0):
+            if (extent.disk_offset, extent.disk_length) == (0, 0):
                 result.append(b"\x00" * read_count)
             else:
                 if (extent.compression, extent.encryption) == (c_btrfs.BTRFS_COMPRESS_NONE, 0):

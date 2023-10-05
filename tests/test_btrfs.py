@@ -216,3 +216,61 @@ def test_btrfs_profiles_partial(fixture: str, request: pytest.FixtureRequest) ->
     else:
         fs = Btrfs(fhs)
         assert_test_data(fs)
+
+
+def test_btrfs_sparse(btrfs_sparse: BinaryIO):
+    fs = Btrfs(btrfs_sparse)
+
+    entry = fs.get("sparse_start")
+    assert entry.size == 0x3C000
+    assert entry.extents() == [
+        (0, 0, 0, 0, 0, 40 * 4096),
+        (0, 0, 0xD28000, 20 * 4096, 0, 20 * 4096),
+    ]
+    assert entry.open().read() == ((b"\x00" * 4096) * 40) + ((b"\x01" * 4096) * 20)
+
+    entry = fs.get("sparse_hole")
+    assert entry.size == 0x3C000
+    assert entry.extents() == [
+        (0, 0, 0xD00000, 20 * 4096, 0, 20 * 4096),
+        (0, 0, 0, 0, 0, 20 * 4096),
+        (0, 0, 0xD14000, 20 * 4096, 0, 20 * 4096),
+    ]
+    assert entry.open().read() == ((b"\x01" * 4096) * 20) + ((b"\x00" * 4096) * 20) + ((b"\x01" * 4096) * 20)
+
+    entry = fs.get("sparse_end")
+    assert entry.size == 0x3C000
+    assert entry.extents() == [
+        (0, 0, 0xD3C000, 20 * 4096, 0, 20 * 4096),
+        (0, 0, 0, 0, 0, 40 * 4096),
+    ]
+    assert entry.open().read() == ((b"\x01" * 4096) * 20) + ((b"\x00" * 4096) * 40)
+
+    entry = fs.get("sparse_all")
+    assert entry.size == 0x500000
+    assert entry.extents() == [
+        (0, 0, 0, 0, 0, 1280 * 4096),
+    ]
+    assert entry.open().read() == (b"\x00" * 4096) * 1280
+
+    entry = fs.get("snapshot/sparse_hole")
+    assert entry.size == 0x3C000
+    assert entry.extents() == [
+        (0, 0, 0xD00000, 20 * 4096, 0, 10 * 4096),
+        (0, 0, 0xD50000, 1 * 4096, 0, 1 * 4096),
+        (0, 0, 0, 0, 0, 39 * 4096),
+        (0, 0, 0xD52000, 10 * 4096, 0, 10 * 4096),
+    ]
+    assert entry.open().read() == ((b"\x01" * 4096) * 10) + ((b"\x00" * 4096) * 50)
+
+    entry = fs.get("snapshot/sparse_end")
+    assert entry.size == 0x3C000
+    assert entry.extents() == [
+        (0, 0, 0xD3C000, 20 * 4096, 0, 1 * 4096),
+        (0, 0, 0xD5C000, 1 * 4096, 0, 1 * 4096),
+        (0, 0, 0xD3C000, 20 * 4096, 2 * 4096, 18 * 4096),
+        (0, 0, 0, 0, 0, 40 * 4096),
+    ]
+    assert entry.open().read() == (b"\x01" * (4096 + 123)) + (b"\x02") + (b"\x01" * ((4096 * 19) - 124)) + (
+        (b"\x00" * 4096) * 40
+    )

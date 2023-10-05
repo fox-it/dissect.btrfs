@@ -31,6 +31,11 @@ def btrfs_default() -> Iterator[BinaryIO]:
 
 
 @pytest.fixture
+def btrfs_sparse() -> Iterator[BinaryIO]:
+    yield from open_file_gz("data/btrfs-sparse.bin.gz")
+
+
+@pytest.fixture
 def btrfs_subvolume() -> Iterator[BinaryIO]:
     yield from open_file_gz("data/btrfs-subvolume.bin.gz")
 
