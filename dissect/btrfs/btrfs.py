@@ -14,7 +14,11 @@ from uuid import UUID
 
 from dissect.util import ts
 from dissect.util.stream import BufferedStream
-from google_crc32c import extend as crc32c
+
+try:
+    from google_crc32c import extend as crc32c
+except ImportError:
+    from dissect.btrfs.crc32c import update as crc32c
 
 from dissect.btrfs.c_btrfs import FT_MAP, c_btrfs
 from dissect.btrfs.exceptions import (
@@ -254,7 +258,7 @@ class Subvolume:
                 node = node.link_inode
 
             # https://stackoverflow.com/a/40433980
-            part_hash = crc32c(~1 ^ 0xFFFFFFFF, part) ^ 0xFFFFFFFF
+            part_hash = (crc32c((~1 ^ 0xFFFFFFFF) & 0xFFFFFFFF, part) ^ 0xFFFFFFFF) & 0xFFFFFFFF
             try:
                 _, data = subvolume.tree.find(node.inum, c_btrfs.BTRFS_DIR_ITEM_KEY, part_hash)
             except KeyError:
