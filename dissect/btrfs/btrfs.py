@@ -538,8 +538,9 @@ class INode:
                 raise NotImplementedError(f"Unknown dir_item type: {dir_item}")
 
     def extents(self) -> Optional[list[Extent]]:
-        if isinstance((fh := self.open()), ExtentStream):
-            return fh.extents
+        with self.open() as fh:
+            if isinstance(fh, ExtentStream):
+                return fh.extents
 
     def open(self) -> BinaryIO:
         """Return the data stream for the inode.
