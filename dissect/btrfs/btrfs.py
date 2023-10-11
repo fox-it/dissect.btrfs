@@ -257,8 +257,11 @@ class Subvolume:
             while node.is_symlink():
                 node = node.link_inode
 
+            # The Linux kernel doesn't do an initial and final XOR with 0xFFFFFFFF
+            # Btrfs uses an initial CRC of `(u32)~1`, which is effectively the same as 1 XOR 0xFFFFFFFF
+            # We still need to invert the XOR of the result though
             # https://stackoverflow.com/a/40433980
-            part_hash = (crc32c((~1 ^ 0xFFFFFFFF) & 0xFFFFFFFF, part) ^ 0xFFFFFFFF) & 0xFFFFFFFF
+            part_hash = (crc32c(1, part) ^ 0xFFFFFFFF) & 0xFFFFFFFF
             try:
                 _, data = subvolume.tree.find(node.inum, c_btrfs.BTRFS_DIR_ITEM_KEY, part_hash)
             except KeyError:
