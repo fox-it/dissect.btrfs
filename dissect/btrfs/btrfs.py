@@ -22,6 +22,7 @@ except ImportError:
 
 from dissect.btrfs.c_btrfs import FT_MAP, c_btrfs
 from dissect.btrfs.exceptions import (
+    Error,
     FileNotFoundError,
     NotADirectoryError,
     NotASymlinkError,
@@ -51,7 +52,7 @@ class Btrfs:
             fh.seek(c_btrfs.BTRFS_SUPER_INFO_OFFSET)
             sb = c_btrfs.btrfs_super_block(fh)
             if sb.magic != c_btrfs.BTRFS_MAGIC:
-                raise ValueError("Invalid btrfs superblock")
+                raise Error("Invalid btrfs superblock")
             sb_fhs.append((sb, fh))
 
         if len({sb.fsid for sb, _ in sb_fhs}) > 1:
