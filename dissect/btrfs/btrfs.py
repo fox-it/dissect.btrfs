@@ -355,7 +355,7 @@ class INode:
     @cached_property
     def type(self) -> int:
         """Return the file type."""
-        return FT_MAP[self._type] or stat.S_IFMT(self.inode.mode)
+        return FT_MAP.get(self._type) or stat.S_IFMT(self.inode.mode)
 
     @cached_property
     def atime(self) -> datetime:
