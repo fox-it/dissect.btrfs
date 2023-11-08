@@ -22,6 +22,7 @@ except ImportError:
 
 from dissect.btrfs.c_btrfs import FT_MAP, c_btrfs
 from dissect.btrfs.exceptions import (
+    Error,
     FileNotFoundError,
     NotADirectoryError,
     NotASymlinkError,
@@ -51,7 +52,7 @@ class Btrfs:
             fh.seek(c_btrfs.BTRFS_SUPER_INFO_OFFSET)
             sb = c_btrfs.btrfs_super_block(fh)
             if sb.magic != c_btrfs.BTRFS_MAGIC:
-                raise ValueError("Invalid btrfs superblock")
+                raise Error("Invalid btrfs superblock")
             sb_fhs.append((sb, fh))
 
         if len({sb.fsid for sb, _ in sb_fhs}) > 1:
@@ -354,7 +355,7 @@ class INode:
     @cached_property
     def type(self) -> int:
         """Return the file type."""
-        return FT_MAP[self._type] or stat.S_IFMT(self.inode.mode)
+        return FT_MAP.get(self._type) or stat.S_IFMT(self.inode.mode)
 
     @cached_property
     def atime(self) -> datetime:
