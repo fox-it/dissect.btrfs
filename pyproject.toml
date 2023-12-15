@@ -27,7 +27,6 @@ classifiers = [
 dependencies = [
     "dissect.cstruct>=3.0.dev,<4.0.dev",
     "dissect.util>=3.0.dev,<4.0.dev",
-    "google-crc32c",
 ]
 dynamic = ["version"]
 
@@ -40,6 +39,9 @@ repository = "https://github.com/fox-it/dissect.btrfs"
 full = [
     "python-lzo",
     "zstandard",
+]
+gcrc32 = [
+    "google-crc32c",
 ]
 
 [tool.black]
