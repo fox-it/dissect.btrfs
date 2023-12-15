@@ -40,7 +40,7 @@ full = [
     "python-lzo",
     "zstandard",
 ]
-crc32 = [
+gcrc32 = [
     "google-crc32c",
 ]
 
