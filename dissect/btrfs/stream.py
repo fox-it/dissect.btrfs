@@ -10,14 +10,14 @@ from dissect.util.stream import AlignedStream
 
 try:
     import lzo
-except ImportError:
+except (AttributeError, ImportError):
     from dissect.util.compression import lzo
 
 try:
     import zstandard
 
     HAS_ZSTD = True
-except ImportError:
+except (AttributeError, ImportError):
     HAS_ZSTD = False
 
 from dissect.btrfs.c_btrfs import (

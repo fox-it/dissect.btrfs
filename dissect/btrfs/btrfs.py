@@ -17,7 +17,7 @@ from dissect.util.stream import BufferedStream
 
 try:
     from google_crc32c import extend as crc32c
-except ImportError:
+except (AttributeError, ImportError):
     from dissect.btrfs.crc32c import update as crc32c
 
 from dissect.btrfs.c_btrfs import FT_MAP, c_btrfs
