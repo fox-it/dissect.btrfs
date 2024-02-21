@@ -37,7 +37,7 @@ repository = "https://github.com/fox-it/dissect.btrfs"
 
 [project.optional-dependencies]
 full = [
-    "python-lzo",
+    "python-lzo; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
     "zstandard",
 ]
 gcrc32 = [
