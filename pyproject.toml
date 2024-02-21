@@ -37,7 +37,9 @@ repository = "https://github.com/fox-it/dissect.btrfs"
 
 [project.optional-dependencies]
 full = [
-    "python-lzo",
+    # There are no Windows PyPy wheels available for python-lzo
+    # So we use a pure python fallback for it.
+    "python-lzo; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
     "zstandard",
 ]
 gcrc32 = [
