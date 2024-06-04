@@ -873,8 +873,7 @@ struct btrfs_file_extent_item_reg {
 };
 """
 
-c_btrfs = cstruct()
-c_btrfs.load(btrfs_def)
+c_btrfs = cstruct().load(btrfs_def)
 
 BTRFS_BLOCK_GROUP = c_btrfs.BTRFS_BLOCK_GROUP
 

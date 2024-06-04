@@ -25,8 +25,8 @@ classifiers = [
   "Topic :: Utilities",
 ]
 dependencies = [
-    "dissect.cstruct>=3.0.dev,<4.0.dev",
-    "dissect.util>=3.0.dev,<4.0.dev",
+    "dissect.cstruct>=4.dev,<5",
+    "dissect.util>=3,<4",
 ]
 dynamic = ["version"]
 
@@ -44,6 +44,11 @@ full = [
 ]
 gcrc32 = [
     "google-crc32c",
+]
+dev = [
+    "dissect.btrfs[full]",
+    "dissect.cstruct>=4.0.dev,<5.0.dev",
+    "dissect.util>=3.0.dev,<4.0.dev",
 ]
 
 [tool.black]
