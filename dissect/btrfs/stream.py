@@ -6,12 +6,8 @@ from bisect import bisect_right
 from typing import TYPE_CHECKING, BinaryIO, NamedTuple
 from uuid import UUID
 
+from dissect.util.compression import lzo
 from dissect.util.stream import AlignedStream
-
-try:
-    import lzo
-except ImportError:
-    from dissect.util.compression import lzo
 
 try:
     import zstandard
