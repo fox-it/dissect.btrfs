@@ -8,10 +8,10 @@ from dissect.btrfs.exceptions import (
 
 __all__ = [
     "Btrfs",
-    "INode",
-    "Subvolume",
     "Error",
     "FileNotFoundError",
+    "INode",
     "NotADirectoryError",
     "NotASymlinkError",
+    "Subvolume",
 ]

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import TYPE_CHECKING, Iterator, Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal
 
 from dissect.btrfs.c_btrfs import c_btrfs
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.btrfs.btrfs import Btrfs
 
 
@@ -20,9 +22,7 @@ class BTree:
         root_offset: Optional offset to open the B-tree from.
     """
 
-    def __init__(
-        self, btrfs: Btrfs, root_item: Optional[c_btrfs.btrfs_root_item] = None, root_offset: Optional[int] = None
-    ):
+    def __init__(self, btrfs: Btrfs, root_item: c_btrfs.btrfs_root_item | None = None, root_offset: int | None = None):
         self.btrfs = btrfs
 
         if not root_item and not root_offset:
@@ -38,7 +38,7 @@ class BTree:
         return Cursor(self)
 
     def find(
-        self, objectid: Optional[int] = None, type: Optional[int] = None, offset: Optional[int] = None
+        self, objectid: int | None = None, type: int | None = None, offset: int | None = None
     ) -> tuple[c_btrfs.btrfs_item, memoryview]:
         """Search for a single item in the B-tree.
 
@@ -127,7 +127,7 @@ class Cursor:
 
         return key
 
-    def _read_item(self, index: int) -> Union[c_btrfs.btrfs_key_ptr, c_btrfs.btrfs_item]:
+    def _read_item(self, index: int) -> c_btrfs.btrfs_key_ptr | c_btrfs.btrfs_item:
         """Read an item at the specified index.
 
         Args:
@@ -214,7 +214,7 @@ class Cursor:
         """
         return self.item(), self.data()
 
-    def item(self) -> Union[c_btrfs.btrfs_key_ptr, c_btrfs.btrfs_item]:
+    def item(self) -> c_btrfs.btrfs_key_ptr | c_btrfs.btrfs_item:
         """Retrieve a leaf or branch item.
 
         Cursor can be positioned at a branch or leaf item.
@@ -224,9 +224,9 @@ class Cursor:
 
         return self._read_item(self._index)
 
-    def items(self) -> Iterator[Union[c_btrfs.btrfs_key_ptr, c_btrfs.btrfs_item]]:
+    def items(self) -> Iterator[c_btrfs.btrfs_key_ptr | c_btrfs.btrfs_item]:
         """Iterate over all items in the current node."""
-        for i in range(0, self._header.nritems):
+        for i in range(self._header.nritems):
             yield self._read_item(i)
 
     def data(self) -> memoryview:
@@ -245,9 +245,9 @@ class Cursor:
 
     def iter(
         self,
-        objectid: Optional[int] = None,
-        type: Optional[int] = None,
-        offset: Optional[int] = None,
+        objectid: int | None = None,
+        type: int | None = None,
+        offset: int | None = None,
         ignore_offset: bool = False,
     ) -> Iterator[tuple[c_btrfs.btrfs_item, memoryview]]:
         """Search and iterate the B-tree for the specified key.
@@ -274,9 +274,9 @@ class Cursor:
 
     def walk(
         self,
-        objectid: Optional[int] = None,
-        type: Optional[int] = None,
-        offset: Optional[int] = None,
+        objectid: int | None = None,
+        type: int | None = None,
+        offset: int | None = None,
     ) -> Iterator[tuple[c_btrfs.btrfs_item, memoryview]]:
         """Walk all leaf items of the B-tree and yield all matching leafs.
 
@@ -296,7 +296,7 @@ class Cursor:
             except ValueError:
                 return
 
-    def search(self, objectid: Optional[int] = None, type: Optional[int] = None, offset: Optional[int] = None) -> bool:
+    def search(self, objectid: int | None = None, type: int | None = None, offset: int | None = None) -> bool:
         """Perform a binary search on the current node for the key with the given parameters.
 
         Puts the cursor at the index of the matching item, or just before a "greater" item if no exact match is found.
@@ -330,22 +330,23 @@ class Cursor:
                 self._index = min_idx
                 self.push(self._read_item(min_idx).blockptr)
                 continue
-            else:
-                if result >= 0:
-                    # Count a matching or larger key as a win
-                    self._index = min_idx
-                    return True
-                elif min_idx == self._header.nritems - 1:
-                    # Special case where we have exhausted all leaf nodes but all keys are still smaller
-                    # In this case, try to travel to the next node (up one level, next item, down one level)
-                    # Worst case we end up at a key that's larger than our search parameters.
-                    self._index = min_idx
-                    try:
-                        self.next_node()
-                        continue
-                    except ValueError:
-                        self._index = None
-                        return False
+
+            if result >= 0:
+                # Count a matching or larger key as a win
+                self._index = min_idx
+                return True
+
+            if min_idx == self._header.nritems - 1:
+                # Special case where we have exhausted all leaf nodes but all keys are still smaller
+                # In this case, try to travel to the next node (up one level, next item, down one level)
+                # Worst case we end up at a key that's larger than our search parameters.
+                self._index = min_idx
+                try:
+                    self.next_node()
+                    continue
+                except ValueError:
+                    self._index = None
+                    return False
 
             break
 
@@ -355,9 +356,9 @@ class Cursor:
 
 def _cmp_key(
     key: c_btrfs.btrfs_disk_key,
-    objectid: Optional[int] = None,
-    type: Optional[int] = None,
-    offset: Optional[int] = None,
+    objectid: int | None = None,
+    type: int | None = None,
+    offset: int | None = None,
 ) -> Literal[1, -1, 0]:
     """Compare a B-tree key on disk to a given object ID, type and offset.
 

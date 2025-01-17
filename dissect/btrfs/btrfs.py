@@ -7,9 +7,8 @@ from __future__ import annotations
 
 import io
 import stat
-from datetime import datetime
 from functools import cache, cached_property, lru_cache
-from typing import BinaryIO, Iterator, Optional, Union
+from typing import TYPE_CHECKING, BinaryIO
 from uuid import UUID
 
 from dissect.util import ts
@@ -35,6 +34,10 @@ from dissect.btrfs.exceptions import (
 from dissect.btrfs.stream import ChunkStream, Extent, ExtentStream, decode_extent
 from dissect.btrfs.tree import BTree
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
+
 
 class Btrfs:
     """Btrfs filesystem implementation.
@@ -46,7 +49,7 @@ class Btrfs:
         fh: A file-like object for the volume to use for parsing Btrfs.
     """
 
-    def __init__(self, fh: Union[BinaryIO, list[BinaryIO]]):
+    def __init__(self, fh: BinaryIO | list[BinaryIO]):
         self.fhs = fh if isinstance(fh, list) else [fh]
 
         if not self.fhs:
@@ -89,7 +92,7 @@ class Btrfs:
         self.default_subvolume = self._open_default_subvolume()
         self.root = self.default_subvolume.root
 
-    def get(self, path: Union[str, int], node: Optional[INode] = None) -> INode:
+    def get(self, path: str | int, node: INode | None = None) -> INode:
         """Retrieve a Btrfs inode by path or inode number.
 
         Args:
@@ -113,7 +116,7 @@ class Btrfs:
                 yield self.open_subvolume(item.key.offset)
             cursor.reset()
 
-    def find_subvolume(self, path: Optional[str] = None) -> Optional[Subvolume]:
+    def find_subvolume(self, path: str | None = None) -> Subvolume | None:
         """Find a subvolume by path.
 
         Args:
@@ -123,7 +126,9 @@ class Btrfs:
             if subvolume.path == path:
                 return subvolume
 
-    def open_subvolume(self, objectid: int, parent: Optional[INode] = None) -> Subvolume:
+        return None
+
+    def open_subvolume(self, objectid: int, parent: INode | None = None) -> Subvolume:
         """Open a subvolume.
 
         Args:
@@ -194,7 +199,7 @@ class Subvolume:
         parent: Optional parent node to attach to the root of the subvolume.
     """
 
-    def __init__(self, btrfs: Btrfs, objectid: int, parent: Optional[INode] = None):
+    def __init__(self, btrfs: Btrfs, objectid: int, parent: INode | None = None):
         self.btrfs = btrfs
         self.objectid = objectid
         self.parent = parent
@@ -234,7 +239,7 @@ class Subvolume:
 
         return "/".join(parts[::-1])
 
-    def get(self, path: Union[str, int], node: Optional[INode] = None) -> INode:
+    def get(self, path: str | int, node: INode | None = None) -> INode:
         """Retrieve a Btrfs inode by path or inode number.
 
         Args:
@@ -286,7 +291,7 @@ class Subvolume:
 
         return node
 
-    def inode(self, inum: int, type: Optional[int] = None, parent: Optional[INode] = None) -> INode:
+    def inode(self, inum: int, type: int | None = None, parent: INode | None = None) -> INode:
         """Return an :class:`INode` by number, optionally attaching a type and parent."""
         return INode(self, inum, type, parent)
 
@@ -312,13 +317,7 @@ class INode:
         parent: Optional parent of this inode, if this inode is parsed from a directory listing.
     """
 
-    def __init__(
-        self,
-        subvolume: Subvolume,
-        inum: int,
-        type: Optional[int] = None,
-        parent: Optional[INode] = None,
-    ):
+    def __init__(self, subvolume: Subvolume, inum: int, type: int | None = None, parent: INode | None = None):
         self.subvolume = subvolume
         self.btrfs = subvolume.btrfs
         self.inum = inum
@@ -450,14 +449,11 @@ class INode:
     def link_inode(self) -> INode:
         """Resolve the symlink target to an inode."""
         link = self.link
-        if link.startswith("/"):
-            relnode = None
-        else:
-            relnode = self.parent
+        relnode = None if link.startswith("/") else self.parent
         return self.subvolume.get(self.link, relnode)
 
     @property
-    def parents(self) -> list[INode]:
+    def parents(self) -> Iterator[INode]:
         for item, data in self.subvolume.tree.cursor().iter(
             self.inum, c_btrfs.BTRFS_INODE_REF_KEY, 0, ignore_offset=True
         ):
@@ -517,7 +513,7 @@ class INode:
 
     def listdir(self) -> dict[str, INode]:
         """Return a directory listing."""
-        return {name: inode for name, inode in self.iterdir()}
+        return dict(self.iterdir())
 
     def iterdir(self) -> Iterator[tuple[str, INode]]:
         """Iterate directory contents."""
@@ -543,10 +539,12 @@ class INode:
             else:
                 raise NotImplementedError(f"Unknown dir_item type: {dir_item}")
 
-    def extents(self) -> Optional[list[Extent]]:
+    def extents(self) -> list[Extent] | None:
         with self.open() as fh:
             if isinstance(fh, ExtentStream):
                 return fh.extents
+
+        return None
 
     def open(self) -> BinaryIO:
         """Return the data stream for the inode.
