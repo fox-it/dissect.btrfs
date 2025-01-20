@@ -200,11 +200,8 @@ def test_btrfs_profiles(fixture: str, request: pytest.FixtureRequest) -> None:
 )
 def test_btrfs_profiles_partial(fixture: str, request: pytest.FixtureRequest) -> None:
     fhs = request.getfixturevalue(fixture)
-    if fixture == "btrfs_profile_dup":
-        # This test data just so happens to have all chunks on the second device
-        fhs = fhs[:-1]
-    else:
-        fhs = fhs[1:]
+    # The btrfs_profile_dup test data just so happens to have all chunks on the second device
+    fhs = fhs[:-1] if fixture == "btrfs_profile_dup" else fhs[1:]
 
     if fixture in ("btrfs_profile_dup", "btrfs_profile_raid0"):
         with pytest.raises(Error, match="Missing stripe disk for chunk offset .+"):
