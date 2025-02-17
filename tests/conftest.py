@@ -32,61 +32,61 @@ def open_files_gz(names: list[str], mode: str = "rb") -> Iterator[list[gzip.Gzip
 
 @pytest.fixture
 def btrfs_default() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/btrfs-default.bin.gz")
+    yield from open_file_gz("_data/btrfs-default.bin.gz")
 
 
 @pytest.fixture
 def btrfs_sparse() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/btrfs-sparse.bin.gz")
+    yield from open_file_gz("_data/btrfs-sparse.bin.gz")
 
 
 @pytest.fixture
 def btrfs_subvolume() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/btrfs-subvolume.bin.gz")
+    yield from open_file_gz("_data/btrfs-subvolume.bin.gz")
 
 
 @pytest.fixture
 def btrfs_subvolume_nested() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/btrfs-subvolume-nested.bin.gz")
+    yield from open_file_gz("_data/btrfs-subvolume-nested.bin.gz")
 
 
 @pytest.fixture
 def btrfs_subvolume_custom_default() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/btrfs-subvolume-custom-default.bin.gz")
+    yield from open_file_gz("_data/btrfs-subvolume-custom-default.bin.gz")
 
 
 @pytest.fixture
 def btrfs_subvolume_snapshot() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/btrfs-subvolume-snapshot.bin.gz")
+    yield from open_file_gz("_data/btrfs-subvolume-snapshot.bin.gz")
 
 
 @pytest.fixture
 def btrfs_compression() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/btrfs-compression.bin.gz")
+    yield from open_file_gz("_data/btrfs-compression.bin.gz")
 
 
 @pytest.fixture
 def btrfs_profile_dup() -> Iterator[list[BinaryIO]]:
-    yield from open_files_gz(["data/btrfs-dup-1.bin.gz", "data/btrfs-dup-2.bin.gz"])
+    yield from open_files_gz(["_data/btrfs-dup-1.bin.gz", "_data/btrfs-dup-2.bin.gz"])
 
 
 @pytest.fixture
 def btrfs_profile_raid0() -> Iterator[list[BinaryIO]]:
-    yield from open_files_gz(["data/btrfs-raid0-1.bin.gz", "data/btrfs-raid0-2.bin.gz"])
+    yield from open_files_gz(["_data/btrfs-raid0-1.bin.gz", "_data/btrfs-raid0-2.bin.gz"])
 
 
 @pytest.fixture
 def btrfs_profile_raid1() -> Iterator[list[BinaryIO]]:
-    yield from open_files_gz(["data/btrfs-raid1-1.bin.gz", "data/btrfs-raid1-2.bin.gz"])
+    yield from open_files_gz(["_data/btrfs-raid1-1.bin.gz", "_data/btrfs-raid1-2.bin.gz"])
 
 
 @pytest.fixture
 def btrfs_profile_raid1c3() -> Iterator[list[BinaryIO]]:
     yield from open_files_gz(
         [
-            "data/btrfs-raid1c3-1.bin.gz",
-            "data/btrfs-raid1c3-2.bin.gz",
-            "data/btrfs-raid1c3-3.bin.gz",
+            "_data/btrfs-raid1c3-1.bin.gz",
+            "_data/btrfs-raid1c3-2.bin.gz",
+            "_data/btrfs-raid1c3-3.bin.gz",
         ]
     )
 
@@ -95,24 +95,24 @@ def btrfs_profile_raid1c3() -> Iterator[list[BinaryIO]]:
 def btrfs_profile_raid1c4() -> Iterator[list[BinaryIO]]:
     yield from open_files_gz(
         [
-            "data/btrfs-raid1c4-1.bin.gz",
-            "data/btrfs-raid1c4-2.bin.gz",
-            "data/btrfs-raid1c4-3.bin.gz",
-            "data/btrfs-raid1c4-4.bin.gz",
+            "_data/btrfs-raid1c4-1.bin.gz",
+            "_data/btrfs-raid1c4-2.bin.gz",
+            "_data/btrfs-raid1c4-3.bin.gz",
+            "_data/btrfs-raid1c4-4.bin.gz",
         ]
     )
 
 
 @pytest.fixture
 def btrfs_profile_raid5() -> Iterator[list[BinaryIO]]:
-    yield from open_files_gz(["data/btrfs-raid5-1.bin.gz", "data/btrfs-raid5-2.bin.gz"])
+    yield from open_files_gz(["_data/btrfs-raid5-1.bin.gz", "_data/btrfs-raid5-2.bin.gz"])
 
 
 @pytest.fixture
 def btrfs_profile_raid6() -> Iterator[list[BinaryIO]]:
-    yield from open_files_gz(["data/btrfs-raid6-1.bin.gz", "data/btrfs-raid6-2.bin.gz", "data/btrfs-raid6-3.bin.gz"])
+    yield from open_files_gz(["_data/btrfs-raid6-1.bin.gz", "_data/btrfs-raid6-2.bin.gz", "_data/btrfs-raid6-3.bin.gz"])
 
 
 @pytest.fixture
 def btrfs_profile_raid10() -> Iterator[list[BinaryIO]]:
-    yield from open_files_gz(["data/btrfs-raid10-1.bin.gz", "data/btrfs-raid10-2.bin.gz"])
+    yield from open_files_gz(["_data/btrfs-raid10-1.bin.gz", "_data/btrfs-raid10-2.bin.gz"])
