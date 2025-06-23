@@ -22,7 +22,7 @@ try:
         warnings.simplefilter("ignore")
         from google_crc32c import extend as crc32c
 except ImportError:
-    from dissect.util.crc32c import update as crc32c
+    from dissect.util.hash.crc32c import update as crc32c
 
 from dissect.btrfs.c_btrfs import FT_MAP, c_btrfs
 from dissect.btrfs.exceptions import (
