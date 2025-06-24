@@ -26,7 +26,7 @@ classifiers = [
 ]
 dependencies = [
     "dissect.cstruct>=4,<5",
-    "dissect.util>=3,<4",
+    "dissect.util>=3.22.dev,<4", #TODO: Remove once we release a new dissect version
 ]
 dynamic = ["version"]
 
@@ -50,7 +50,7 @@ lzo = [
 dev = [
     "dissect.btrfs[full]",
     "dissect.cstruct>=4.0.dev,<5.0.dev",
-    "dissect.util>=3.0.dev,<4.0.dev",
+    "dissect.util>=3.22.dev,<4.0.dev", #TODO: Remove once we release a new dissect version
 ]
 
 [tool.ruff]
