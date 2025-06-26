@@ -42,11 +42,6 @@ full = [
 gcrc32 = [
     "google-crc32c",
 ]
-lzo = [
-    # There are no Windows PyPy wheels available for python-lzo
-    # So we use a pure python fallback for it.
-    "python-lzo; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
-]
 dev = [
     "dissect.btrfs[full]",
     "dissect.cstruct>=4.0.dev,<5.0.dev",
