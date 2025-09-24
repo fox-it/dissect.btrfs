@@ -204,7 +204,7 @@ def test_btrfs_profiles_partial(fixture: str, request: pytest.FixtureRequest) ->
     fhs = fhs[:-1] if fixture == "btrfs_profile_dup" else fhs[1:]
 
     if fixture in ("btrfs_profile_dup", "btrfs_profile_raid0"):
-        with pytest.raises(Error, match="Missing stripe disk for chunk offset .+"):
+        with pytest.raises(Error, match=r"Missing stripe disk for chunk offset .+"):
             fs = Btrfs(fhs)
 
     elif fixture in ("btrfs_profile_raid5", "btrfs_profile_raid6"):
