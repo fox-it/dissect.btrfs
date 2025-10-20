@@ -12,17 +12,8 @@ from typing import TYPE_CHECKING, BinaryIO
 from uuid import UUID
 
 from dissect.util import ts
+from dissect.util.hash import crc32c
 from dissect.util.stream import BufferedStream
-
-try:
-    import warnings
-
-    # If the C extension is not available, google-crc32c will display a warning
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        from google_crc32c import extend as crc32c
-except ImportError:
-    from dissect.util.hash.crc32c import update as crc32c
 
 from dissect.btrfs.c_btrfs import FT_MAP, c_btrfs
 from dissect.btrfs.exceptions import (
@@ -272,7 +263,7 @@ class Subvolume:
             # Btrfs uses an initial CRC of `(u32)~1`, which is effectively the same as 1 XOR 0xFFFFFFFF
             # We still need to invert the XOR of the result though
             # https://stackoverflow.com/a/40433980
-            part_hash = (crc32c(1, part) ^ 0xFFFFFFFF) & 0xFFFFFFFF
+            part_hash = (crc32c.update(1, part) ^ 0xFFFFFFFF) & 0xFFFFFFFF
             try:
                 _, data = subvolume.tree.find(node.inum, c_btrfs.BTRFS_DIR_ITEM_KEY, part_hash)
             except KeyError:
