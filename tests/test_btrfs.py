@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 from typing import BinaryIO
 
 import pytest
@@ -165,6 +166,11 @@ def test_btrfs_compression(btrfs_compression: BinaryIO) -> None:
     fh = fs.get("zstd_inline.txt").open()
     assert isinstance(fh, BufferedStream)
     assert fh.read() == (b"zstd" * 256) + b"\n"
+
+    #
+    fh = fs.get("zstd_lorem_ipsum.txt").open()
+    assert len([extent for extent in fh.extents if extent.compression == c_btrfs.BTRFS_COMPRESS_ZSTD]) == 4
+    assert hashlib.sha256(fh.read()).hexdigest() == "ac9db55e11e804c58cb5ac8baded462cd3e7a570e4f3c980298ef2b417467b1d"
 
 
 @pytest.mark.parametrize(

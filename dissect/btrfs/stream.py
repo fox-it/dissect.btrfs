@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import sys
 import zlib
 from bisect import bisect_right
 from typing import TYPE_CHECKING, BinaryIO, NamedTuple
@@ -10,8 +11,10 @@ from dissect.util.compression import lzo
 from dissect.util.stream import AlignedStream
 
 try:
-    import zstandard
-
+    if sys.version_info >= (3, 14):
+        from compression import zstd
+    else:
+        from backports import zstd
     HAS_ZSTD = True
 except ImportError:
     HAS_ZSTD = False
@@ -324,9 +327,19 @@ def decode_extent(buf: bytes, compression: int, encryption: int, sector_size: in
         buf = bytes(decompressed_buf)
     elif compression == c_btrfs.BTRFS_COMPRESS_ZSTD:
         if not HAS_ZSTD:
-            raise RuntimeError("Install `zstandard` to read zstandard compressed files")
-        buf = zstandard.decompress(buf)
+            raise RuntimeError("Install `backports.zstd` to read zstandard compressed files")
 
+        ctx = zstd.ZstdDecompressor()
+        unused_data = buf
+        buf = b""
+        # Each extent seems to contain at most 1 frame, but the loop will work with multiple frame by extent
+        # Each frame has its own magic number.
+        # if frame start with 0x0 -> start of padding
+        while unused_data and unused_data[0] != 0x0:
+            # Decompress one frame
+            buf += ctx.decompress(unused_data)
+            unused_data = ctx.unused_data
+            ctx = zstd.ZstdDecompressor()
     if encryption:
         # btrfs doesn't actually support extent encryption yet
         raise NotImplementedError("BTRFS extent encryption is not supported")
