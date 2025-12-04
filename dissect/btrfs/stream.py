@@ -12,7 +12,7 @@ from dissect.util.stream import AlignedStream
 
 try:
     if sys.version_info >= (3, 14):
-        from compression import zstd
+        from compression import zstd  # novermin
     else:
         from backports import zstd
     HAS_ZSTD = True
@@ -329,17 +329,19 @@ def decode_extent(buf: bytes, compression: int, encryption: int, sector_size: in
         if not HAS_ZSTD:
             raise RuntimeError("Install `backports.zstd` to read zstandard compressed files")
 
-        ctx = zstd.ZstdDecompressor()
-        unused_data = buf
-        buf = b""
-        # Each extent seems to contain at most 1 frame, but the loop will work with multiple frame by extent
-        # Each frame has its own magic number.
-        # if frame start with 0x0 -> start of padding
-        while unused_data and unused_data[0] != 0x0:
-            # Decompress one frame
-            buf += ctx.decompress(unused_data)
-            unused_data = ctx.unused_data
-            ctx = zstd.ZstdDecompressor()
+        # Slightly modified zstd.decompress function that breaks on EOF
+        data = buf
+        results = []
+        while True:
+            decomp = zstd.ZstdDecompressor()
+            results.append(decomp.decompress(data))
+            if decomp.eof:
+                break
+            data = decomp.unused_data
+            if not data:
+                break
+
+        buf = b"".join(results)
     if encryption:
         # btrfs doesn't actually support extent encryption yet
         raise NotImplementedError("BTRFS extent encryption is not supported")
