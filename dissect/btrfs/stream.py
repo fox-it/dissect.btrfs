@@ -75,7 +75,6 @@ class ChunkStream(AlignedStream):
             offset: The logical offset to add this chunk for.
             chunk: The chunk item to add.
         """
-
         chunk_idx = bisect_right(self._chunk_offsets, offset)
         if chunk_idx > 0:
             # Check if we already have a chunk for this offset
