@@ -98,7 +98,7 @@ select = [
   "SLOT",
   "SIM",
   "TID",
-  "TCH",
+  "TC",
   "PTH",
   "PLC",
   "TRY",
