@@ -132,6 +132,7 @@ strict = true
 [tool.ruff.lint.isort]
 known-first-party = ["dissect.btrfs"]
 known-third-party = ["dissect"]
+required-imports = ["from __future__ import annotations"]
 
 [tool.setuptools.packages.find]
 include = ["dissect.*"]
