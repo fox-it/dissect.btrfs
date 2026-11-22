@@ -382,16 +382,16 @@ btrfs_def = """
 
 /* different types of block groups (and chunks) */
 flag BTRFS_BLOCK_GROUP : uint64 {
-    DATA        = 0x0001
-    SYSTEM      = 0x0002
-    METADATA    = 0x0004
-    RAID0       = 0x0008
-    RAID1       = 0x0010
-    DUP         = 0x0020
-    RAID10      = 0x0040
-    RAID5       = 0x0080
-    RAID6       = 0x0100
-    RAID1C3     = 0x0200
+    DATA        = 0x0001,
+    SYSTEM      = 0x0002,
+    METADATA    = 0x0004,
+    RAID0       = 0x0008,
+    RAID1       = 0x0010,
+    DUP         = 0x0020,
+    RAID10      = 0x0040,
+    RAID5       = 0x0080,
+    RAID6       = 0x0100,
+    RAID1C3     = 0x0200,
     RAID1C4     = 0x0400
 };
 
